@@ -1,0 +1,260 @@
+Experiment 3 — Data Cleaning
+Q1. Create a messy hospital dataset and identify data types, missing values, duplicates, inconsistent categories and invalid values.
+
+import pandas as pd
+import numpy as np
+
+df = pd.DataFrame({
+    "patient_id": [1, 2, 3, 4, 5, 5],
+    "gender": ["Male", "F", "female", "M", "Male", "Male"],
+    "city": ["Chennai", " chennai ", "Bangalore",
+             "Bengaluru", "Madurai", "Madurai"],
+    "age": [45, 32, "?", 150, 39, 39],
+    "weight": [72, 60, 85, "NA", 59, 59],
+    "bill_amount": [5000, 7000, 4500, 9000, 6000, 6000]
+})
+
+print("Dataset:")
+print(df)
+
+print("\nData Types:")
+print(df.dtypes)
+
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+print("\nDuplicate Rows:", df.duplicated().sum())
+
+print("\nUnique Gender Values:", df["gender"].unique())
+print("Unique City Values:", df["city"].unique())
+
+print("\nInvalid Age Values:")
+print(df[~pd.to_numeric(df["age"], errors="coerce").between(0, 110)])
+
+Q2. Visualize missing values and identify the rows and columns most affected by missing data.
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df = pd.DataFrame({
+    "age": [25, None, 40, 35, None],
+    "weight": [60, 70, None, None, 80],
+    "bill_amount": [5000, 6000, 7000, None, 8000]
+})
+
+print("Missing Values by Column:")
+print(df.isnull().sum())
+
+print("\nMissing Values by Row:")
+print(df.isnull().sum(axis=1))
+
+sns.heatmap(df.isnull(), cbar=False, cmap="viridis")
+plt.title("Missing Values Heatmap")
+plt.show()
+
+print("\nRows with Most Missing Values:")
+print(df.loc[df.isnull().sum(axis=1).sort_values(ascending=False).index].head())
+
+Q3. Clean inconsistent gender and city labels, convert dates and numeric values, and identify invalid ages and dates.
+
+import pandas as pd
+import numpy as np
+
+df = pd.DataFrame({
+    "gender": ["Male", "F", "female", "M"],
+    "city": ["Chennai", " chennai ", "Bangalore", "Bengaluru"],
+    "age": ["45", "32", "?", "150"],
+    "admission_date": ["2025-01-05", "05/02/2025",
+                       "2025/03/10", "15-04-2025"],
+    "discharge_date": ["2025-01-10", "10/02/2025",
+                       "2025/03/15", "10-04-2025"],
+    "bill_amount": ["5000", "?", "7500", "9000"]
+})
+
+df["gender"] = df["gender"].str.strip().str.lower().replace({
+    "m": "male", "f": "female"
+})
+
+df["city"] = df["city"].str.strip().str.lower().replace({
+    "bangalore": "bengaluru"
+})
+
+df["age"] = pd.to_numeric(df["age"], errors="coerce")
+df["bill_amount"] = pd.to_numeric(df["bill_amount"], errors="coerce")
+
+df["admission_date"] = pd.to_datetime(
+    df["admission_date"], dayfirst=True, errors="coerce"
+)
+df["discharge_date"] = pd.to_datetime(
+    df["discharge_date"], dayfirst=True, errors="coerce"
+)
+
+df["invalid_age"] = ~df["age"].between(0, 110)
+df["invalid_dates"] = df["discharge_date"] < df["admission_date"]
+
+print("Cleaned Data:")
+print(df)
+
+Q4. Convert heterogeneous height values such as 162 cm and 5.4 ft into centimetres.
+
+import pandas as pd
+import numpy as np
+
+df = pd.DataFrame({
+    "height": ["172 cm", "5.4 ft", "180 cm", "5.6 ft", "?"]
+})
+
+def convert_height(value):
+    if pd.isna(value) or value == "?":
+        return np.nan
+
+    value = str(value).strip().lower()
+
+    if "cm" in value:
+        return float(value.replace("cm", "").strip())
+
+    if "ft" in value:
+        feet = float(value.replace("ft", "").strip())
+        return feet * 30.48
+
+    return np.nan
+
+df["height_cm"] = df["height"].apply(convert_height)
+
+print(df)
+
+
+Q5. Impute missing ages using the median and missing weights using gender-wise medians. Compare age distributions before and after imputation.
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df = pd.DataFrame({
+    "gender": ["Male", "Female", "Male", "Female", "Male"],
+    "age": [25, 30, None, 40, 35],
+    "weight": [70, None, 80, 60, None]
+})
+
+plt.figure()
+sns.histplot(df["age"].dropna(), kde=True)
+plt.title("Age Before Imputation")
+plt.show()
+
+df["age"] = df["age"].fillna(df["age"].median())
+
+df["weight"] = df.groupby("gender")["weight"].transform(
+    lambda x: x.fillna(x.median())
+)
+
+print("After Imputation:")
+print(df)
+
+plt.figure()
+sns.histplot(df["age"], kde=True)
+plt.title("Age After Imputation")
+plt.show()
+
+Q6. Remove exact duplicates and key-based duplicates using patient ID and admission date. Report row counts.
+
+import pandas as pd
+
+df = pd.DataFrame({
+    "patient_id": [1, 2, 3, 3, 3],
+    "admission_date": ["2025-01-01", "2025-01-02",
+                       "2025-01-03", "2025-01-03", "2025-01-04"],
+    "bill_amount": [5000, 6000, 7000, 7000, 8000]
+})
+
+print("Original Row Count:", len(df))
+
+df = df.drop_duplicates()
+print("After Exact Duplicate Removal:", len(df))
+
+df = df.drop_duplicates(
+    subset=["patient_id", "admission_date"]
+)
+print("After Key-based Duplicate Removal:", len(df))
+
+print(df)
+
+Q7. Detect bill amount outliers using the IQR rule and winsorise values at the lower and upper fences. Draw box plots before and after.
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+df = pd.DataFrame({
+    "bill_amount": [1000, 1200, 1500, 1800, 2000,
+                    2200, 2500, 2800, 3000, 15000]
+})
+
+plt.boxplot(df["bill_amount"])
+plt.title("Before Winsorising")
+plt.show()
+
+Q1 = df["bill_amount"].quantile(0.25)
+Q3 = df["bill_amount"].quantile(0.75)
+IQR = Q3 - Q1
+
+lower = Q1 - 1.5 * IQR
+upper = Q3 + 1.5 * IQR
+
+print("Lower Fence:", lower)
+print("Upper Fence:", upper)
+
+df["bill_amount_clean"] = df["bill_amount"].clip(
+    lower=lower, upper=upper
+)
+
+print(df)
+
+plt.boxplot(df["bill_amount_clean"])
+plt.title("After Winsorising")
+plt.show()
+
+
+Q8. Log-transform bills, standardize numeric columns, one-hot encode gender, bin ages into decades, bin bills into quartiles, summarize segments and save the cleaned dataset.
+
+import pandas as pd
+import numpy as np
+
+df = pd.DataFrame({
+    "age": [22, 28, 35, 42, 51, 63],
+    "gender": ["Male", "Female", "Male",
+               "Female", "Male", "Female"],
+    "bill_amount": [1000, 2000, 3000, 5000, 8000, 15000]
+})
+
+df["log_bill"] = np.log1p(df["bill_amount"])
+
+df["age_group"] = pd.cut(
+    df["age"],
+    bins=[0, 29, 39, 49, 59, 120],
+    labels=["20s", "30s", "40s", "50s", "60+"]
+)
+
+df["bill_quartile"] = pd.qcut(
+    df["bill_amount"], q=4, labels=False
+)
+
+df["age_zscore"] = (
+    (df["age"] - df["age"].mean()) / df["age"].std()
+)
+
+df["bill_zscore"] = (
+    (df["bill_amount"] - df["bill_amount"].mean())
+    / df["bill_amount"].std()
+)
+
+df = pd.get_dummies(df, columns=["gender"], dtype=int)
+
+print("Cleaned Dataset:")
+print(df)
+
+print("\nMean Bill by Age Group:")
+print(df.groupby("age_group", observed=True)["bill_amount"].mean())
+
+df.to_csv("cleaned_hospital.csv", index=False)
+print("\nCleaned dataset saved.")
+
