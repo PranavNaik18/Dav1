@@ -1,0 +1,197 @@
+Experiment 4 — Exploratory Analysis, Hypothesis Testing & Statistical Inference
+The original experiment uses the Seaborn penguins dataset and also uses titanic for categorical analysis.
+Q1. Calculate descriptive statistics and species-wise mean comparisons for numeric columns.
+
+import pandas as pd
+import seaborn as sns
+
+df = sns.load_dataset("penguins")
+cols = df.select_dtypes(include="number").columns
+
+summary = df[cols].agg(["count", "mean", "median", "std"]).T
+summary["IQR"] = df[cols].quantile(.75) - df[cols].quantile(.25)
+summary["Skewness"] = df[cols].skew()
+summary["Kurtosis"] = df[cols].kurtosis()
+
+print("Descriptive Statistics:\n", summary.round(3))
+print("\nSpecies-wise Means:\n",
+      df.groupby("species")[cols].mean().round(2))
+
+
+Q2. Draw a violin plot of flipper length and a grouped bar chart of body mass by species and sex.
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df = sns.load_dataset("penguins")
+
+sns.violinplot(data=df, x="species",
+               y="flipper_length_mm", inner="box")
+plt.title("Flipper Length by Penguin Species")
+plt.show()
+
+sns.barplot(data=df, x="species", y="body_mass_g", hue="sex")
+plt.title("Mean Body Mass by Species and Sex")
+plt.show()
+
+print(df.groupby(["species", "sex"], observed=True)["body_mass_g"]
+      .mean().unstack().round(2))
+
+
+Q3. Test whether Adelie penguin body mass is normally distributed using a histogram, Q–Q plot and Shapiro–Wilk test.
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy import stats
+
+df = sns.load_dataset("penguins")
+x = df[df["species"] == "Adelie"]["body_mass_g"].dropna()
+
+sns.histplot(x, bins=15, kde=True)
+plt.title("Adelie Body Mass")
+plt.show()
+
+stats.probplot(x, dist="norm", plot=plt)
+plt.title("Q-Q Plot")
+plt.show()
+
+w, p = stats.shapiro(x)
+print("W statistic:", w)
+print("p-value:", p)
+
+if p > 0.05:
+    print("Fail to reject H0: approximately normal")
+else:
+    print("Reject H0: not normally distributed")
+
+
+Q4. Perform a one-sample t-test, two Welch t-tests and a Mann–Whitney U test.
+
+import seaborn as sns
+from scipy import stats
+
+df = sns.load_dataset("penguins")
+
+a = df[df.species == "Adelie"]["body_mass_g"].dropna()
+c = df[df.species == "Chinstrap"]["body_mass_g"].dropna()
+g = df[df.species == "Gentoo"]["body_mass_g"].dropna()
+
+# (a) Test Adelie mean against 3600 g
+print("One-sample t-test:", stats.ttest_1samp(a, 3600))
+
+# (b) Compare Adelie and Chinstrap
+print("Adelie vs Chinstrap:", stats.ttest_ind(a, c, equal_var=False))
+
+# Cohen's d for the comparison
+pooled = (((len(a)-1)*a.var() + (len(c)-1)*c.var())
+          / (len(a)+len(c)-2)) ** 0.5
+print("Cohen's d:", (a.mean()-c.mean()) / pooled)
+
+# (c) Compare Adelie and Gentoo
+print("Adelie vs Gentoo:", stats.ttest_ind(a, g, equal_var=False))
+
+# Confirm comparison (b) using Mann–Whitney U
+print("Mann–Whitney U:", stats.mannwhitneyu(a, c))
+
+
+Q5. Test whether survival is independent of sex in the Titanic dataset and visualise survival proportions.
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import chi2_contingency
+import numpy as np
+
+df = sns.load_dataset("titanic")
+table = pd.crosstab(df["sex"], df["survived"])
+
+chi2, p, dof, expected = chi2_contingency(table)
+v = np.sqrt(chi2 / table.to_numpy().sum())
+
+print("Crosstab:\n", table)
+print("Chi-square:", chi2)
+print("p-value:", p)
+print("Cramer's V:", v)
+
+print("\nSurvival Proportions:")
+print(df.groupby("sex", observed=True)["survived"].mean())
+
+sns.barplot(data=df, x="sex", y="survived")
+plt.title("Survival Proportions by Sex")
+plt.show()
+
+Q6. Perform one-way ANOVA on flipper length across species and follow it with Tukey's HSD test.
+
+import seaborn as sns
+from scipy.stats import f_oneway
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+
+df = sns.load_dataset("penguins").dropna(
+    subset=["species", "flipper_length_mm"]
+)
+
+groups = [
+    df[df.species == s]["flipper_length_mm"]
+    for s in ["Adelie", "Chinstrap", "Gentoo"]
+]
+
+print("ANOVA:", f_oneway(*groups))
+
+print(pairwise_tukeyhsd(
+    df["flipper_length_mm"], df["species"], alpha=0.05
+))
+
+
+Q7. Calculate a 95% confidence interval for Gentoo mean body mass, Titanic survival proportion and Gentoo median body mass using bootstrap.
+
+import seaborn as sns
+import numpy as np
+from scipy import stats
+
+df = sns.load_dataset("penguins")
+g = df[df.species == "Gentoo"]["body_mass_g"].dropna()
+
+# (a) 95% t-based confidence interval for mean
+print("Mean CI:", stats.t.interval(
+    0.95, len(g)-1, loc=g.mean(),
+    scale=stats.sem(g)
+))
+
+# (b) 95% confidence interval for survival proportion
+t = sns.load_dataset("titanic")["survived"].dropna()
+p = t.mean()
+se = np.sqrt(p * (1-p) / len(t))
+print("Survival proportion CI:", (p-1.96*se, p+1.96*se))
+
+# (c) Bootstrap CI for Gentoo median
+np.random.seed(42)
+boot = [np.median(np.random.choice(g, len(g), replace=True))
+        for _ in range(5000)]
+print("Median bootstrap CI:",
+      np.percentile(boot, [2.5, 97.5]))
+
+
+Q8. Create a correlation heatmap, regression plot and OLS model for body mass versus flipper length.
+
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+
+df = sns.load_dataset("penguins")
+num = df.select_dtypes(include="number")
+
+sns.heatmap(num.corr(), annot=True, cmap="coolwarm")
+plt.title("Correlation Heatmap")
+plt.show()
+
+df = df.dropna(subset=["body_mass_g", "flipper_length_mm"])
+
+sns.regplot(data=df, x="flipper_length_mm", y="body_mass_g")
+plt.title("Body Mass vs Flipper Length")
+plt.show()
+
+X = sm.add_constant(df["flipper_length_mm"])
+y = df["body_mass_g"]
+model = sm.OLS(y, X).fit()
+
+print(model.summary())
