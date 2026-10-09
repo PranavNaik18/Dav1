@@ -1,0 +1,142 @@
+Q1. Print Python and library versions and install one extra package.
+%pip install openpyxl
+import sys
+import numpy as np
+import pandas as pd
+import matplotlib
+import seaborn as sns
+
+print("Python Version:", sys.version)
+print("NumPy Version:", np.__version__)
+print("Pandas Version:", pd.__version__)
+print("Matplotlib Version:", matplotlib.__version__)
+print("Seaborn Version:", sns.__version__)
+
+Q2. Generate a 5 × 4 matrix of marks using NumPy and calculate the overall mean, subject-wise means, student totals, students whose average is at least 75, and the Z-score-normalized matrix.
+
+import numpy as np
+
+np.random.seed(42)
+
+marks = np.random.randint(35, 101, size=(5, 4))
+
+print("Marks Matrix:\n", marks)
+print("Overall Mean:", marks.mean())
+print("Subject-wise Means:", marks.mean(axis=0))
+print("Student Totals:", marks.sum(axis=1))
+
+averages = marks.mean(axis=1)
+print("Students with Average >= 75:",
+      np.where(averages >= 75)[0])
+
+z_scores = (marks - marks.mean()) / marks.std()
+
+print("Z-score Normalized Matrix:\n", z_scores)
+
+Q3. Create a student DataFrame, filter students with CGPA above 8, add an honours column, and display a branch-wise summary.
+
+import pandas as pd
+
+data = {
+    "Reg_No": [101, 102, 103, 104, 105, 106],
+    "Name": ["Arun", "Priya", "Kumar", "Divya", "Ravi", "Anu"],
+    "Branch": ["CSE", "ISE", "CSE", "ECE", "ISE", "CSE"],
+    "CGPA": [8.7, 7.9, 9.1, 8.2, 8.5, 7.5]
+}
+
+df = pd.DataFrame(data)
+
+print("Complete DataFrame:\n", df)
+
+print("\nStudents with CGPA > 8:")
+print(df[df["CGPA"] > 8])
+
+df["Honours"] = df["CGPA"] >= 8.5
+
+print("\nDataFrame with Honours:")
+print(df)
+
+print("\nBranch-wise Summary:")
+print(df.groupby("Branch")["CGPA"].agg(
+    ["count", "mean", "max"]
+))
+
+Q4. Load the tips dataset and display its shape, data types, five-number summary, missing values, and duplicate count.
+
+import pandas as pd
+import seaborn as sns
+
+df = sns.load_dataset("tips")
+
+print("Shape:", df.shape)
+
+print("\nData Types:")
+print(df.dtypes)
+
+print("\nFive-number Summary:")
+print(df.describe())
+
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+print("\nDuplicate Rows:", df.duplicated().sum())
+
+Q5. Analyse factors that influence tip percentage using the tips dataset. Compare tip percentage by day and time, find correlations, and draw an annotated chart.
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df = sns.load_dataset("tips")
+
+df["tip_pct"] = (df["tip"] / df["total_bill"]) * 100
+
+print("Average Tip Percentage by Day and Time:")
+print(df.groupby(["day", "time"], observed=True)["tip_pct"].mean())
+
+print("\nCorrelation Matrix:")
+print(df.select_dtypes(include="number").corr())
+
+avg_tip = df.groupby("day", observed=True)["tip_pct"].mean()
+
+avg_tip.plot(kind="bar", color="skyblue")
+
+for i, value in enumerate(avg_tip):
+    plt.text(i, value, f"{value:.2f}%", ha="center", va="bottom")
+
+plt.title("Average Tip Percentage by Day")
+plt.xlabel("Day")
+plt.ylabel("Tip Percentage")
+plt.tight_layout()
+plt.show()
+
+print("Highest Tip Percentage Day:", avg_tip.idxmax())
+print("Lowest Tip Percentage Day:", avg_tip.idxmin())
+
+Q6. Calculate average, highest and lowest student marks, filter students scoring above 75, and draw a bar chart.
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+df = pd.DataFrame({
+    "Name": ["Arun", "Priya", "Kumar", "Divya", "Ravi"],
+    "Marks": [85, 72, 90, 68, 80]
+})
+
+print("Student Marks:\n", df)
+print("Average Marks:", df["Marks"].mean())
+print("Highest Marks:", df["Marks"].max())
+print("Lowest Marks:", df["Marks"].min())
+
+print("\nStudents scoring above 75:")
+print(df[df["Marks"] > 75])
+
+plt.bar(df["Name"], df["Marks"])
+plt.title("Student Marks")
+plt.xlabel("Student")
+plt.ylabel("Marks")
+plt.show()
+
+
+
+
