@@ -1,0 +1,276 @@
+Experiment 2 — Data Gathering and Preparation
+Q1. Save a DataFrame in CSV, Excel, JSON, XML and Parquet formats and compare file sizes.
+
+import pandas as pd
+import os
+
+df = pd.DataFrame({
+    "order_id": [1001, 1002, 1003, 1004],
+    "product": ["Laptop", "Mouse", "Keyboard", "Monitor"],
+    "quantity": [2, 10, 5, 3],
+    "price": [55000, 750, 1500, 18000]
+})
+
+df.to_csv("sales.csv", index=False)
+df.to_excel("sales.xlsx", index=False)
+df.to_json("sales.json", orient="records", indent=4)
+df.to_xml("sales.xml", index=False, root_name="sales", row_name="order")
+df.to_parquet("sales.parquet", index=False)
+
+files = ["sales.csv", "sales.xlsx", "sales.json",
+         "sales.xml", "sales.parquet"]
+
+for file in files:
+    size = os.path.getsize(file)
+    print(file, ":", size, "bytes")
+
+Q2. Read a difficult CSV containing semicolon separators, comma decimals, missing-value markers and dates. Convert the date column to datetime.
+
+import pandas as pd
+from io import StringIO
+
+csv_data = """order_id;date;product;quantity;unit_price
+1001;05/01/2026;Laptop;2;55000,50
+1002;06/01/2026;Mouse;10;750,25
+1003;07/01/2026;Keyboard;?;1500,75
+1004;08/01/2026;Monitor;3;NA
+1005;09/01/2026;Printer;-;12000,00
+"""
+
+df = pd.read_csv(
+    StringIO(csv_data),
+    sep=";",
+    decimal=",",
+    na_values=["?", "NA", "-"]
+)
+
+df["date"] = pd.to_datetime(df["date"], dayfirst=True)
+
+print("DataFrame:")
+print(df)
+
+print("\nData Types:")
+print(df.dtypes)
+
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+print("\nIs date a datetime column?")
+print(pd.api.types.is_datetime64_any_dtype(df["date"]))
+
+Q3. Flatten nested JSON into a tidy table using pd.json_normalize and extract a table from HTML using pd.read_html.
+
+import pandas as pd
+from io import StringIO
+
+orders_json = [
+    {
+        "order_id": 1001,
+        "customer": {
+            "customer_id": "C001",
+            "name": "Anita",
+            "city": "Bengaluru"
+        },
+        "line_items": [
+            {"product": "Laptop", "quantity": 2, "price": 55000},
+            {"product": "Mouse", "quantity": 5, "price": 750}
+        ]
+    },
+    {
+        "order_id": 1002,
+        "customer": {
+            "customer_id": "C002",
+            "name": "Rahul",
+            "city": "Chennai"
+        },
+        "line_items": [
+            {"product": "Keyboard", "quantity": 3, "price": 1500},
+            {"product": "Monitor", "quantity": 1, "price": 18000}
+        ]
+    }
+]
+
+tidy = pd.json_normalize(
+    orders_json,
+    record_path="line_items",
+    meta=[
+        "order_id",
+        ["customer", "customer_id"],
+        ["customer", "name"],
+        ["customer", "city"]
+    ]
+)
+
+print("Flattened JSON:")
+print(tidy)
+
+html = """
+<table>
+<tr><th>Product</th><th>Sales</th></tr>
+<tr><td>Laptop</td><td>120000</td></tr>
+<tr><td>Mouse</td><td>15000</td></tr>
+<tr><td>Keyboard</td><td>25000</td></tr>
+</table>
+"""
+
+tables = pd.read_html(StringIO(html))
+
+print("\nHTML Table:")
+print(tables[0])
+
+Q4. Perform inner, left, right and outer joins on orders and customers. Find customers who have never ordered.
+
+import pandas as pd
+
+customers = pd.DataFrame({
+    "customer_id": ["C001", "C002", "C003", "C004", "C005"],
+    "customer_name": ["Anita", "Rahul", "Priya", "Karthik", "Meena"]
+})
+
+orders = pd.DataFrame({
+    "order_id": [1001, 1002, 1003],
+    "customer_id": ["C001", "C002", "C003"],
+    "amount": [5000, 3000, 7000]
+})
+
+print("Inner Join:")
+print(pd.merge(orders, customers, on="customer_id", how="inner"))
+
+print("\nLeft Join:")
+print(pd.merge(orders, customers, on="customer_id", how="left"))
+
+print("\nRight Join:")
+print(pd.merge(orders, customers, on="customer_id", how="right"))
+
+print("\nOuter Join:")
+print(pd.merge(orders, customers, on="customer_id", how="outer"))
+
+ordered_ids = orders["customer_id"]
+never_ordered = customers[~customers["customer_id"].isin(ordered_ids)]
+
+print("\nCustomers Who Never Ordered:")
+print(never_ordered)
+
+Q5. Convert a wide month-wise sales table into long format using melt, then create a summary using pivot_table with totals.
+
+import pandas as pd
+
+df = pd.DataFrame({
+    "Product": ["Laptop", "Mouse", "Keyboard"],
+    "January": [100, 200, 150],
+    "February": [120, 220, 180],
+    "March": [140, 240, 190]
+})
+
+print("Wide Data:")
+print(df)
+
+long_df = df.melt(
+    id_vars="Product",
+    var_name="Month",
+    value_name="Sales"
+)
+
+print("\nLong/Tidy Data:")
+print(long_df)
+
+pivot = pd.pivot_table(
+    long_df,
+    values="Sales",
+    index="Product",
+    columns="Month",
+    aggfunc="sum",
+    margins=True,
+    margins_name="Total"
+)
+
+print("\nPivot Table:")
+print(pivot)
+
+
+Q6. Generate a large sensor dataset and compare full reading, memory-optimized reading and chunked aggregation.
+
+import pandas as pd
+import numpy as np
+import time
+
+np.random.seed(42)
+
+n = 1000000
+
+sensor_df = pd.DataFrame({
+    "sensor_id": np.random.choice(["S1", "S2", "S3"], n),
+    "temperature": np.random.normal(30, 5, n)
+})
+
+sensor_df.to_csv("sensor.csv", index=False)
+
+# 1. Read the complete file
+start = time.time()
+df = pd.read_csv("sensor.csv")
+print("Full Read Mean:", df["temperature"].mean())
+print("Full Read Time:", round(time.time() - start, 2), "seconds")
+print("Full Read Memory (bytes):", df.memory_usage(deep=True).sum())
+
+# 2. Read using optimized data types
+start = time.time()
+df_opt = pd.read_csv(
+    "sensor.csv",
+    dtype={"sensor_id": "category", "temperature": "float32"}
+)
+print("\nOptimized Mean:", df_opt["temperature"].mean())
+print("Optimized Time:", round(time.time() - start, 2), "seconds")
+print("Optimized Memory (bytes):", df_opt.memory_usage(deep=True).sum())
+
+# 3. Read in chunks
+start = time.time()
+total = 0
+count = 0
+
+for chunk in pd.read_csv(
+    "sensor.csv",
+    chunksize=100000,
+    dtype={"sensor_id": "category", "temperature": "float32"}
+):
+    total += chunk["temperature"].sum()
+    count += chunk["temperature"].count()
+
+print("\nChunked Mean:", total / count)
+print("Chunked Time:", round(time.time() - start, 2), "seconds")
+
+Q7. Simulate a real-time stream of 300 sensor events and calculate a running mean and 50-event sliding-window mean.
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+np.random.seed(42)
+
+events = np.random.normal(30, 5, 300)
+
+# Simulate a few out-of-order arrivals
+events[[10, 50, 100]] = events[[100, 10, 50]]
+
+running_means = []
+window_means = []
+window = []
+total = 0
+
+for value in events:
+    total += value
+    running_means.append(total / (len(running_means) + 1))
+
+    window.append(value)
+    if len(window) > 50:
+        window.pop(0)
+
+    window_means.append(np.mean(window))
+
+plt.plot(running_means, label="Running Mean")
+plt.plot(window_means, label="50-Event Sliding Mean")
+plt.xlabel("Event Number")
+plt.ylabel("Temperature")
+plt.title("Real-Time Sensor Stream")
+plt.legend()
+plt.show()
+
