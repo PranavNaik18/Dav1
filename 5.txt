@@ -1,0 +1,174 @@
+Task 1. Transaction encoding
+
+Question: Convert grocery baskets into one-hot format and plot individual item support.
+
+from mlxtend.preprocessing import TransactionEncoder
+import pandas as pd
+import matplotlib.pyplot as plt
+
+baskets = [
+    ['milk', 'bread'], ['bread', 'butter'],
+    ['milk', 'bread', 'butter'], ['milk', 'eggs'],
+    ['bread', 'eggs'], ['milk', 'bread'],
+    ['milk', 'butter'], ['bread', 'butter'],
+    ['milk', 'bread', 'eggs'], ['bread'],
+    ['milk', 'bread', 'butter'], ['eggs', 'butter'],
+    ['milk', 'eggs'], ['bread', 'eggs'],
+    ['milk', 'bread'], ['milk', 'butter'],
+    ['bread', 'butter'], ['milk', 'bread', 'eggs'],
+    ['milk', 'bread'], ['bread', 'eggs']
+]
+
+te = TransactionEncoder()
+X = pd.DataFrame(
+    te.fit(baskets).transform(baskets),
+    columns=te.columns_
+)
+
+X.mean().plot(kind='bar')
+plt.ylabel('Support')
+plt.show()
+
+print(X.head())
+Task 2. Apriori algorithm
+
+Question: Find frequent itemsets with minimum support 0.2 and show how itemset count changes when support increases.
+
+from mlxtend.frequent_patterns import apriori
+import matplotlib.pyplot as plt
+
+f = apriori(X, min_support=0.2, use_colnames=True)
+print(f.sort_values('support', ascending=False))
+
+thresholds = [0.1, 0.2, 0.3, 0.4, 0.5]
+counts = [
+    len(apriori(X, min_support=s, use_colnames=True))
+    for s in thresholds
+]
+
+plt.plot(thresholds, counts, marker='o')
+plt.xlabel('Minimum Support')
+plt.ylabel('Frequent Itemsets')
+plt.show()
+Task 3. Generate association rules
+
+Question: Calculate support, confidence, lift, leverage and conviction for association rules with confidence at least 0.6.
+
+from mlxtend.frequent_patterns import apriori, association_rules
+
+f = apriori(X, min_support=0.1, use_colnames=True)
+
+rules = association_rules(
+    f, metric='confidence', min_threshold=0.6
+)
+
+print(rules[[
+    'antecedents', 'consequents', 'support',
+    'confidence', 'lift', 'leverage', 'conviction'
+]])
+Task 4. Compare confidence and lift
+
+Question: Find high-confidence rules and explain why high confidence alone does not guarantee an interesting association.
+
+from mlxtend.frequent_patterns import association_rules
+
+rules = association_rules(
+    f, metric='confidence', min_threshold=0.1
+)
+
+print(rules.sort_values(
+    'confidence', ascending=False
+)[['antecedents', 'consequents', 'confidence', 'lift']].head(10))
+
+Interpretation: A rule with high confidence but lift close to 1 may not be interesting because the consequent is already common. Lift measures how much more often the items occur together than expected under independence.
+
+Task 5. Compare Apriori and FP-Growth
+
+Question: Generate 1,000 baskets, compare running times and verify that both algorithms find the same frequent itemsets.
+
+from mlxtend.frequent_patterns import apriori, fpgrowth
+from mlxtend.preprocessing import TransactionEncoder
+import numpy as np
+import pandas as pd
+import time
+
+rng = np.random.default_rng(42)
+items = ['milk', 'bread', 'butter', 'eggs', 'tea', 'coffee']
+
+baskets = [
+    list(np.array(items)[rng.random(6) < 0.4]) or ['milk']
+    for _ in range(1000)
+]
+
+te = TransactionEncoder()
+Z = pd.DataFrame(
+    te.fit(baskets).transform(baskets),
+    columns=te.columns_
+)
+
+t = time.time()
+a = apriori(Z, min_support=0.05, use_colnames=True)
+print("Apriori time:", time.time()-t)
+
+t = time.time()
+fp = fpgrowth(Z, min_support=0.05, use_colnames=True)
+print("FP-Growth time:", time.time()-t)
+
+print("Same itemsets:",
+      set(map(frozenset, a.itemsets)) ==
+      set(map(frozenset, fp.itemsets)))
+Task 6. Partition-based mining
+
+Question: Divide the 1,000-basket dataset into four partitions, find local candidates, verify them globally and compare with direct mining.
+
+from mlxtend.frequent_patterns import apriori
+import numpy as np
+
+parts = np.array_split(Z, 4)
+candidates = set()
+
+for part in parts:
+    local = apriori(part, min_support=0.05, use_colnames=True)
+    candidates.update(map(frozenset, local.itemsets))
+
+direct = apriori(Z, min_support=0.05, use_colnames=True)
+direct_sets = set(map(frozenset, direct.itemsets))
+
+verified = {
+    s for s in candidates
+    if Z[list(s)].all(axis=1).mean() >= 0.05
+}
+
+print("Candidates:", len(candidates))
+print("Verified:", len(verified))
+print("Direct:", len(direct_sets))
+print("Matches:", verified == direct_sets)
+Task 7. Association-rule graph
+
+Question: Draw a directed graph where antecedents point to consequents and edge widths represent lift.
+
+import networkx as nx
+import matplotlib.pyplot as plt
+from mlxtend.frequent_patterns import apriori, association_rules
+
+f = apriori(X, min_support=0.1, use_colnames=True)
+rules = association_rules(
+    f, metric='confidence', min_threshold=0.3
+).sort_values('lift', ascending=False).head(10)
+
+G = nx.DiGraph()
+
+for _, row in rules.iterrows():
+    a = ', '.join(row['antecedents'])
+    b = ', '.join(row['consequents'])
+    G.add_edge(a, b, weight=float(row['lift']))
+
+pos = nx.spring_layout(G, seed=42)
+
+nx.draw(
+    G, pos, with_labels=True,
+    node_size=1800, font_size=8,
+    width=[G[u][v]['weight'] for u, v in G.edges()]
+)
+
+plt.show()
